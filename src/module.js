@@ -14,11 +14,11 @@ const defaultSettings = {
   trycatch: false
 }
 
-module.exports.analyse = analyse
+
 
 var report
 
-function analyse (ast, walker, options) {
+module.exports.analyse = function analyse (ast, walker, options) {
   // TODO: Asynchronise
   var settings
   var currentReport
@@ -144,7 +144,7 @@ function processOperands (node, syntax, currentReport) {
 
 function processHalsteadMetric (node, syntax, metric, currentReport) {
   if (Array.isArray(syntax[metric])) {
-    syntax[metric].forEach(s => {
+    syntax[metric].forEach(function(s){
       var identifier
       if (_isFunction(s.identifier)) {
         identifier = s.identifier(node)
@@ -230,7 +230,7 @@ function calculateMetrics (settings) {
     0,
     0
   ]
-  report.functions.forEach(functionReport => {
+  report.functions.forEach(function(functionReport){
     calculateCyclomaticDensity(functionReport)
     functionReport.halstead.calculate()
     sumMaintainabilityMetrics(sums, indices, functionReport)
@@ -242,14 +242,14 @@ function calculateMetrics (settings) {
     sumMaintainabilityMetrics(sums, indices, report.aggregate)
     count = 1
   }
-  averages = sums.map(sum => sum / count)
+  averages = sums.map(function(sum){return sum/count;})
   report.maintainability = calculateMaintainabilityIndex(
     averages[indices.effort],
     averages[indices.cyclomatic],
     averages[indices.loc],
     settings.newmi
   )
-  Object.keys(indices).forEach(index => {
+  Object.keys(indices).forEach(function(index){
     report[index] = averages[indices[index]]
   })
 }

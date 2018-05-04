@@ -1,444 +1,510 @@
-'use strict'
+'use strict';
 
-const _merge = require('lodash.merge')
-const _isString = require('lodash.isstring')
-const safeName = require('../safeName')
-const safeArray = require('../safeArray')
+var _merge = require('lodash.merge');
+var _isString = require('lodash.isstring');
+var safeName = require('../safeName');
+var safeArray = require('../safeArray');
 
-const DEFAULTS = {
+var DEFAULTS = {
   assignableName: undefined,
   children: safeArray(undefined),
   cyclomatic: 0,
   lloc: 0,
   newScope: undefined,
   dependencies: undefined
-}
+};
 
-const operators = properties => properties.map(property => {
-  if (property && typeof property.identifier !== 'undefined') {
-    return property
-  }
-  return {
-    identifier: property
-  }
-})
+var operators = function operators(properties) {
+  return properties.map(function (property) {
+    if (property && typeof property.identifier !== 'undefined') {
+      return property;
+    }
+    return {
+      identifier: property
+    };
+  });
+};
 
-const operands =
-  identifiers => identifiers.map(identifier => ({identifier}))
+var operands = function operands(identifiers) {
+  return identifiers.map(function (identifier) {
+    return { identifier: identifier };
+  });
+};
 
-function defineSyntax (spec) {
-  const computedSpec = {
+function defineSyntax(spec) {
+  var computedSpec = {
     children: safeArray(spec.children),
     operands: operands(safeArray(spec.operands)),
     operators: operators(safeArray(spec.operators))
-  }
-  return _merge({}, DEFAULTS, spec, computedSpec)
+  };
+  return _merge({}, DEFAULTS, spec, computedSpec);
 }
 
-const ArrayExpression = settings => defineSyntax({
-  operators: '[]',
-  operands: safeName,
-  children: 'elements'
-})
+var ArrayExpression = function ArrayExpression(settings) {
+  return defineSyntax({
+    operators: '[]',
+    operands: safeName,
+    children: 'elements'
+  });
+};
 
-const AssignmentExpression = settings => defineSyntax({
-  operators: node => node.operator,
-  children: [ 'left', 'right' ],
-  assignableName: node => {
-    if (node.left.type === 'MemberExpression') {
-      return safeName(node.left.object) +
-        '.' +
-        node.left.property.name
+var AssignmentExpression = function AssignmentExpression(settings) {
+  return defineSyntax({
+    operators: function operators(node) {
+      return node.operator;
+    },
+    children: ['left', 'right'],
+    assignableName: function assignableName(node) {
+      if (node.left.type === 'MemberExpression') {
+        return safeName(node.left.object) + '.' + node.left.property.name;
+      }
+      return safeName(node.left.id);
     }
-    return safeName(node.left.id)
-  }
-})
+  });
+};
 
-const BinaryExpression = settings => defineSyntax({
-  operators: node => node.operator,
-  children: [ 'left', 'right' ]
-})
+var BinaryExpression = function BinaryExpression(settings) {
+  return defineSyntax({
+    operators: function operators(node) {
+      return node.operator;
+    },
+    children: ['left', 'right']
+  });
+};
 
-const BlockStatement = settings => defineSyntax({
-  children: 'body'
-})
+var BlockStatement = function BlockStatement(settings) {
+  return defineSyntax({
+    children: 'body'
+  });
+};
 
-const BreakStatement = settings => defineSyntax({
-  lloc: 1,
-  operators: 'break',
-  children: [ 'label' ]
-})
+var BreakStatement = function BreakStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    operators: 'break',
+    children: ['label']
+  });
+};
 
-let amdPathAliases = {}
+var amdPathAliases = {};
 
-function dependencyPath (item, fallback) {
+function dependencyPath(item, fallback) {
   if (item.type === 'Literal') {
-    return amdPathAliases[item.value] || item.value
+    return amdPathAliases[item.value] || item.value;
   }
-  return fallback
+  return fallback;
 }
 
-function processRequire (node) {
-  let line = node.loc.start.line
-  let path = '* dynamic dependency *'
-  let args = node.arguments
+function processRequire(node) {
+  var line = node.loc.start.line;
+  var path = '* dynamic dependency *';
+  var args = node.arguments;
 
   if (args.length === 1) {
     return {
-      line,
+      line: line,
       type: 'CommonJS',
       path: dependencyPath(args[0], path)
-    }
+    };
   }
 
   if (args.length === 2) {
-    let type = 'AMD'
+    var type = 'AMD';
 
     if (args[0].type === 'ArrayExpression') {
-      return args[0].elements.map(
-        item => ({
-          type,
-          line,
+      return args[0].elements.map(function (item) {
+        return {
+          type: type,
+          line: line,
           path: dependencyPath(item, path)
-        })
-      )
+        };
+      });
     }
 
     return {
-      type,
-      line,
+      type: type,
+      line: line,
       path: dependencyPath(args[0], '* dynamic dependencies *')
-    }
+    };
   }
 }
 
-const CallExpression = settings => defineSyntax({
-  lloc: node => node.callee.type === 'FunctionExpression' ? 1 : 0,
-  operators: '()',
-  children: [ 'arguments', 'callee' ],
-  dependencies: (node, clearAliases) => {
-    if (clearAliases) {
-      // TODO: This prohibits async running. Refine by passing in module id as key for amdPathAliases.
-      amdPathAliases = {}
-    }
+var CallExpression = function CallExpression(settings) {
+  return defineSyntax({
+    lloc: function lloc(node) {
+      return node.callee.type === 'FunctionExpression' ? 1 : 0;
+    },
+    operators: '()',
+    children: ['arguments', 'callee'],
+    dependencies: function dependencies(node, clearAliases) {
+      if (clearAliases) {
+        // TODO: This prohibits async running. Refine by passing in module id as key for amdPathAliases.
+        amdPathAliases = {};
+      }
 
-    if (node.callee.type === 'Identifier' && node.callee.name === 'require') {
-      return processRequire(node)
-    }
+      if (node.callee.type === 'Identifier' && node.callee.name === 'require') {
+        return processRequire(node);
+      }
 
-    if (
-      node.callee.type === 'MemberExpression' &&
-      node.callee.object.type === 'Identifier' &&
-      node.callee.object.name === 'require' &&
-      node.callee.property.type === 'Identifier' &&
-      node.callee.property.name === 'config'
-    ) {
-      let args = node.arguments
-      if (args.length === 1 && args[0].type === 'ObjectExpression') {
-        args[0].properties.forEach(property => {
-          if (
-            property.key.type === 'Identifier' &&
-            property.key.name === 'paths' &&
-            property.value.type === 'ObjectExpression'
-          ) {
-            property.value.properties.forEach(alias => {
-              if (
-                alias.key.type === 'Identifier' &&
-                alias.value.type === 'Literal'
-              ) {
-                amdPathAliases[alias.key.name] = alias.value.value
-              }
-            })
-          }
-        })
+      if (node.callee.type === 'MemberExpression' && node.callee.object.type === 'Identifier' && node.callee.object.name === 'require' && node.callee.property.type === 'Identifier' && node.callee.property.name === 'config') {
+        var args = node.arguments;
+        if (args.length === 1 && args[0].type === 'ObjectExpression') {
+          args[0].properties.forEach(function (property) {
+            if (property.key.type === 'Identifier' && property.key.name === 'paths' && property.value.type === 'ObjectExpression') {
+              property.value.properties.forEach(function (alias) {
+                if (alias.key.type === 'Identifier' && alias.value.type === 'Literal') {
+                  amdPathAliases[alias.key.name] = alias.value.value;
+                }
+              });
+            }
+          });
+        }
       }
     }
-  }
-})
+  });
+};
 
-const CatchClause = settings => defineSyntax({
-  lloc: 1,
-  cyclomatic: settings.trycatch ? 1 : 0,
-  operators: 'catch',
-  children: [ 'param', 'body' ]
-})
+var CatchClause = function CatchClause(settings) {
+  return defineSyntax({
+    lloc: 1,
+    cyclomatic: settings.trycatch ? 1 : 0,
+    operators: 'catch',
+    children: ['param', 'body']
+  });
+};
 
-const ConditionalExpression = settings => defineSyntax({
-  cyclomatic: 1,
-  operators: ':?',
-  children: [
-    'test',
-    'consequent',
-    'alternate'
-  ]
-})
+var ConditionalExpression = function ConditionalExpression(settings) {
+  return defineSyntax({
+    cyclomatic: 1,
+    operators: ':?',
+    children: ['test', 'consequent', 'alternate']
+  });
+};
 
-const ContinueStatement = settings => defineSyntax({
-  lloc: 1,
-  operators: 'continue',
-  children: [ 'label' ]
-})
+var ContinueStatement = function ContinueStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    operators: 'continue',
+    children: ['label']
+  });
+};
 
-const DebuggerStatement = settings => defineSyntax({})
+var DebuggerStatement = function DebuggerStatement(settings) {
+  return defineSyntax({});
+};
 
-const DoWhileStatement = settings => defineSyntax({
-  lloc: 2,
-  cyclomatic: node => node.test ? 1 : 0,
-  operators: 'dowhile',
-  children: [
-    'test',
-    'body'
-  ]
-})
+var DoWhileStatement = function DoWhileStatement(settings) {
+  return defineSyntax({
+    lloc: 2,
+    cyclomatic: function cyclomatic(node) {
+      return node.test ? 1 : 0;
+    },
+    operators: 'dowhile',
+    children: ['test', 'body']
+  });
+};
 
-const EmptyStatement = settings => defineSyntax({})
+var EmptyStatement = function EmptyStatement(settings) {
+  return defineSyntax({});
+};
 
-const ExpressionStatement = settings => defineSyntax({
-  lloc: 1,
-  children: [ 'expression' ]
-})
+var ExpressionStatement = function ExpressionStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    children: ['expression']
+  });
+};
 
-const ForInStatement = settings => defineSyntax({
-  lloc: 1,
-  cyclomatic: settings.forin ? 1 : 0,
-  operators: 'forin',
-  children: [
-    'left',
-    'right',
-    'body'
-  ]
-})
+var ForInStatement = function ForInStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    cyclomatic: settings.forin ? 1 : 0,
+    operators: 'forin',
+    children: ['left', 'right', 'body']
+  });
+};
 
-const ForStatement = settings => defineSyntax({
-  lloc: 1,
-  cyclomatic: node => node.test ? 1 : 0,
-  operators: 'for',
-  children: [
-    'init',
-    'test',
-    'update',
-    'body'
-  ]
-})
+var ForStatement = function ForStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    cyclomatic: function cyclomatic(node) {
+      return node.test ? 1 : 0;
+    },
+    operators: 'for',
+    children: ['init', 'test', 'update', 'body']
+  });
+};
 
-const FunctionDeclaration = settings => defineSyntax({
-  lloc: 1,
-  operators: 'function',
-  operands: node => safeName(node.id),
-  children: [ 'params', 'body' ],
-  newScope: true
-})
+var FunctionDeclaration = function FunctionDeclaration(settings) {
+  return defineSyntax({
+    lloc: 1,
+    operators: 'function',
+    operands: function operands(node) {
+      return safeName(node.id);
+    },
+    children: ['params', 'body'],
+    newScope: true
+  });
+};
 
-const FunctionExpression = settings => defineSyntax({
-  operators: 'function',
-  operands: node => safeName(node.id),
-  children: [ 'params', 'body' ],
-  newScope: true
-})
+var FunctionExpression = function FunctionExpression(settings) {
+  return defineSyntax({
+    operators: 'function',
+    operands: function operands(node) {
+      return safeName(node.id);
+    },
+    children: ['params', 'body'],
+    newScope: true
+  });
+};
 
-const Identifier = settings => defineSyntax({
-  operands: node => node.name
-})
+var Identifier = function Identifier(settings) {
+  return defineSyntax({
+    operands: function operands(node) {
+      return node.name;
+    }
+  });
+};
 
-const IfStatement = settings => defineSyntax({
-  lloc: node => node.alternate ? 2 : 1,
-  cyclomatic: 1,
-  operators: [
-    'if',
-    {
-      filter: node => !!node.alternate,
+var IfStatement = function IfStatement(settings) {
+  return defineSyntax({
+    lloc: function lloc(node) {
+      return node.alternate ? 2 : 1;
+    },
+    cyclomatic: 1,
+    operators: ['if', {
+      filter: function filter(node) {
+        return !!node.alternate;
+      },
       identifier: 'else'
+    }],
+    children: ['test', 'consequent', 'alternate']
+  });
+};
+
+var LabeledStatement = function LabeledStatement(settings) {
+  return defineSyntax({});
+};
+
+var Literal = function Literal(settings) {
+  return defineSyntax({
+    operands: function operands(node) {
+      if (_isString(node.value)) {
+        return '"' + node.value + '"';
+      }
+      return node.value;
     }
-  ],
-  children: [
-    'test',
-    'consequent',
-    'alternate'
-  ]
-})
+  });
+};
 
-const LabeledStatement = settings => defineSyntax({})
+var LogicalExpression = function LogicalExpression(settings) {
+  return defineSyntax({
+    cyclomatic: function cyclomatic(node) {
+      var isAnd = node.operator === '&&';
+      var isOr = node.operator === '||';
+      return isAnd || settings.logicalor && isOr ? 1 : 0;
+    },
+    operators: function operators(node) {
+      return node.operator;
+    },
+    children: ['left', 'right']
+  });
+};
 
-const Literal = settings => defineSyntax({
-  operands: node => {
-    if (_isString(node.value)) {
-      return `"${node.value}"`
+var MemberExpression = function MemberExpression(settings) {
+  return defineSyntax({
+    lloc: function lloc(node) {
+      var type = node.object.type;
+      if (type === 'ObjectExpression' || type === 'ArrayExpression' || type === 'FunctionExpression') {
+        return 1;
+      }
+      return 0;
+    },
+    operators: '.',
+    children: ['object', 'property']
+  });
+};
+
+var NewExpression = function NewExpression(settings) {
+  return defineSyntax({
+    lloc: function lloc(node) {
+      return node.callee.type === 'FunctionExpression' ? 1 : 0;
+    },
+    operators: 'new',
+    children: ['arguments', 'callee']
+  });
+};
+
+var ObjectExpression = function ObjectExpression(settings) {
+  return defineSyntax({
+    operators: '{}',
+    operands: safeName,
+    children: 'properties'
+  });
+};
+
+var Property = function Property(settings) {
+  return defineSyntax({
+    lloc: 1,
+    operators: ':',
+    children: ['key', 'value'],
+    assignableName: function assignableName(node) {
+      return safeName(node.key);
     }
-    return node.value
-  }
-})
+  });
+};
 
-const LogicalExpression = settings => defineSyntax({
-  cyclomatic: node => {
-    var isAnd = node.operator === '&&'
-    var isOr = node.operator === '||'
-    return (isAnd || (settings.logicalor && isOr)) ? 1 : 0
-  },
-  operators: node => node.operator,
-  children: [ 'left', 'right' ]
-})
+var ReturnStatement = function ReturnStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    operators: 'return',
+    children: 'argument'
+  });
+};
 
-const MemberExpression = settings => defineSyntax({
-  lloc: node => {
-    let type = node.object.type
-    if (
-      type === 'ObjectExpression' ||
-      type === 'ArrayExpression' ||
-      type === 'FunctionExpression'
-    ) {
-      return 1
+var SequenceExpression = function SequenceExpression(settings) {
+  return defineSyntax({ children: 'expressions' });
+};
+
+var SwitchCase = function SwitchCase(settings) {
+  return defineSyntax({
+    lloc: 1,
+    cyclomatic: function cyclomatic(node) {
+      return settings.switchcase && node.test ? 1 : 0;
+    },
+    operators: function operators(node) {
+      return node.test ? 'case' : 'default';
+    },
+    children: ['test', 'consequent']
+  });
+};
+
+var SwitchStatement = function SwitchStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    operators: 'switch',
+    children: ['discriminant', 'cases']
+  });
+};
+
+var ThisExpression = function ThisExpression(settings) {
+  return defineSyntax({ operands: 'this' });
+};
+var ThrowStatement = function ThrowStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    operators: 'throw',
+    children: 'argument'
+  });
+};
+
+var TryStatement = function TryStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    children: ['block', 'handler']
+  });
+};
+
+var UnaryExpression = function UnaryExpression(settings) {
+  return defineSyntax({
+    operators: function operators(node) {
+      return node.operator + ' (' + (node.prefix ? 'pre' : 'post') + 'fix)';
+    },
+    children: 'argument'
+  });
+};
+
+var UpdateExpression = function UpdateExpression(settings) {
+  return defineSyntax({
+    operators: function operators(node) {
+      return node.operator + ' (' + (node.prefix ? 'pre' : 'post') + 'fix)';
+    },
+    children: 'argument'
+  });
+};
+
+var VariableDeclaration = function VariableDeclaration(settings) {
+  return defineSyntax({
+    operators: function operators(node) {
+      return node.kind;
+    },
+    children: 'declarations'
+  });
+};
+
+var VariableDeclarator = function VariableDeclarator(settings) {
+  return defineSyntax({
+    lloc: 1,
+    operators: {
+      filter: function filter(node) {
+        return !!node.init;
+      },
+      identifier: '='
+    },
+    children: ['id', 'init'],
+    assignableName: function assignableName(node) {
+      return safeName(node.id);
     }
-    return 0
-  },
-  operators: '.',
-  children: [ 'object', 'property' ]
-})
+  });
+};
 
-const NewExpression = settings => defineSyntax({
-  lloc: node => node.callee.type === 'FunctionExpression' ? 1 : 0,
-  operators: 'new',
-  children: [ 'arguments', 'callee' ]
-})
+var WhileStatement = function WhileStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    cyclomatic: function cyclomatic(node) {
+      return node.test ? 1 : 0;
+    },
+    operators: 'while',
+    children: ['test', 'body']
+  });
+};
 
-const ObjectExpression = settings => defineSyntax({
-  operators: '{}',
-  operands: safeName,
-  children: 'properties'
-})
-
-const Property = settings => defineSyntax({
-  lloc: 1,
-  operators: ':',
-  children: [ 'key', 'value' ],
-  assignableName: node => safeName(node.key)
-})
-
-const ReturnStatement = settings => defineSyntax({
-  lloc: 1,
-  operators: 'return',
-  children: 'argument'
-})
-
-const SequenceExpression = settings => defineSyntax({ children: 'expressions' })
-
-const SwitchCase = settings => defineSyntax({
-  lloc: 1,
-  cyclomatic: node => {
-    return settings.switchcase && node.test ? 1 : 0
-  },
-  operators: node => node.test ? 'case' : 'default',
-  children: [
-    'test',
-    'consequent'
-  ]
-})
-
-const SwitchStatement = settings => defineSyntax({
-  lloc: 1,
-  operators: 'switch',
-  children: [
-    'discriminant',
-    'cases'
-  ]
-})
-
-const ThisExpression = settings => defineSyntax({ operands: 'this' })
-const ThrowStatement = settings => defineSyntax({
-  lloc: 1,
-  operators: 'throw',
-  children: 'argument'
-})
-
-const TryStatement = settings => defineSyntax({
-  lloc: 1,
-  children: [
-    'block',
-    'handler'
-  ]
-})
-
-const UnaryExpression = settings => defineSyntax({
-  operators: node => `${node.operator} (${node.prefix ? 'pre' : 'post'}fix)`,
-  children: 'argument'
-})
-
-const UpdateExpression = settings => defineSyntax({
-  operators: node => `${node.operator} (${node.prefix ? 'pre' : 'post'}fix)`,
-  children: 'argument'
-})
-
-const VariableDeclaration = settings => defineSyntax({
-  operators: node => node.kind,
-  children: 'declarations'
-})
-
-const VariableDeclarator = settings => defineSyntax({
-  lloc: 1,
-  operators: {
-    filter: node => !!node.init,
-    identifier: '='
-  },
-  children: [ 'id', 'init' ],
-  assignableName: node => safeName(node.id)
-})
-
-const WhileStatement = settings => defineSyntax({
-  lloc: 1,
-  cyclomatic: node => node.test ? 1 : 0,
-  operators: 'while',
-  children: [
-    'test',
-    'body'
-  ]
-})
-
-const WithStatement = settings => defineSyntax({
-  lloc: 1,
-  operators: 'with',
-  children: [
-    'object',
-    'body'
-  ]
-})
+var WithStatement = function WithStatement(settings) {
+  return defineSyntax({
+    lloc: 1,
+    operators: 'with',
+    children: ['object', 'body']
+  });
+};
 
 module.exports = {
-  ArrayExpression,
-  AssignmentExpression,
-  BinaryExpression,
-  BlockStatement,
-  BreakStatement,
-  CallExpression,
-  CatchClause,
-  ConditionalExpression,
-  ContinueStatement,
-  DebuggerStatement,
-  DoWhileStatement,
-  EmptyStatement,
-  ExpressionStatement,
-  ForInStatement,
-  ForStatement,
-  FunctionDeclaration,
-  FunctionExpression,
-  Identifier,
-  IfStatement,
-  LabeledStatement,
-  Literal,
-  LogicalExpression,
-  MemberExpression,
-  NewExpression,
-  ObjectExpression,
-  Property,
-  ReturnStatement,
-  SequenceExpression,
-  SwitchCase,
-  SwitchStatement,
-  ThisExpression,
-  ThrowStatement,
-  TryStatement,
-  UnaryExpression,
-  UpdateExpression,
-  VariableDeclaration,
-  VariableDeclarator,
-  WhileStatement,
-  WithStatement
-}
+  ArrayExpression: ArrayExpression,
+  AssignmentExpression: AssignmentExpression,
+  BinaryExpression: BinaryExpression,
+  BlockStatement: BlockStatement,
+  BreakStatement: BreakStatement,
+  CallExpression: CallExpression,
+  CatchClause: CatchClause,
+  ConditionalExpression: ConditionalExpression,
+  ContinueStatement: ContinueStatement,
+  DebuggerStatement: DebuggerStatement,
+  DoWhileStatement: DoWhileStatement,
+  EmptyStatement: EmptyStatement,
+  ExpressionStatement: ExpressionStatement,
+  ForInStatement: ForInStatement,
+  ForStatement: ForStatement,
+  FunctionDeclaration: FunctionDeclaration,
+  FunctionExpression: FunctionExpression,
+  Identifier: Identifier,
+  IfStatement: IfStatement,
+  LabeledStatement: LabeledStatement,
+  Literal: Literal,
+  LogicalExpression: LogicalExpression,
+  MemberExpression: MemberExpression,
+  NewExpression: NewExpression,
+  ObjectExpression: ObjectExpression,
+  Property: Property,
+  ReturnStatement: ReturnStatement,
+  SequenceExpression: SequenceExpression,
+  SwitchCase: SwitchCase,
+  SwitchStatement: SwitchStatement,
+  ThisExpression: ThisExpression,
+  ThrowStatement: ThrowStatement,
+  TryStatement: TryStatement,
+  UnaryExpression: UnaryExpression,
+  UpdateExpression: UpdateExpression,
+  VariableDeclaration: VariableDeclaration,
+  VariableDeclarator: VariableDeclarator,
+  WhileStatement: WhileStatement,
+  WithStatement: WithStatement
+};

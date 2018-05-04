@@ -36,7 +36,7 @@ function walk (tree, settings, callbacks) {
   }
 
   function visitNodes (nodes, assignedName) {
-    nodes.forEach(node => visitNode(node, assignedName))
+    nodes.forEach(function(node){return  visitNode(node, assignedName);})
   }
 
   function visitNode (node, assignedName) {
@@ -60,10 +60,10 @@ function walk (tree, settings, callbacks) {
   function visitChildren (node) {
     const syntax = getSyntax(node.type)
     if (Array.isArray(syntax.children)) {
-      syntax.children.forEach(child => visitChild(
+      syntax.children.forEach(function(child){return visitChild(
         node[child],
         _isFunction(syntax.assignableName) ? syntax.assignableName(node) : ''
-      ))
+      );})
     }
   }
 

@@ -8,7 +8,7 @@ const walker = require('./walker')
 const core = require('./core')
 const defaultParserOptions = require('./config').parserOptions
 
-module.exports.analyse = (source, options, parsing) => {
+module.exports.analyse = function(source, options, parsing){
   if (Array.isArray(source)) {
     return analyseProject(source, options, parsing)
   }
@@ -57,7 +57,7 @@ function defaultParser (source, parserOptions) {
 }
 
 function parseProject (sources, parser, parserOptions, options) {
-  return sources.map(source => {
+  return sources.map(function(source){
     try {
       return {
         ast: parser(source.code, parserOptions),

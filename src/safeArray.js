@@ -1,13 +1,11 @@
-'use strict'
+'use strict';
 
-module.exports = thing => {
+module.exports = function (thing) {
   if (typeof thing === 'undefined') {
-    return []
+    return [];
   }
   if (Array.isArray(thing)) {
-    return thing
+    return thing;
   }
-  return [
-    thing
-  ]
-}
+  return [thing];
+};
